@@ -3,6 +3,7 @@ ROS Indigo package for Poppy robots
 
 This package contains:
 - one Python scripts that create a PoppyHumanoid object and exposes the motors registers values and the primitives
+- one script to use ROS over network through Rest API: 
 
 ###To install: ###
 
@@ -13,6 +14,8 @@ Assuming you have ros indigo installed and a catkin workspace set up at <path/to
     cd ..
     catkin_make
     source devel/setup.bash
+
+###Launch inside the robot: ###
 
 In terminal 1:
 
@@ -32,7 +35,22 @@ You should see all topics created by the poppy node, for example
 - 'poppy/primitive/< primitive name >/start' to start a primitive. Message content not used, so you can use an empty one: rostopic pub -1 /poppy/primitive/arms_copy_motion/start std_msgs/String ""
 - 'poppy/primitive/< primitive name >/stop' same as primitive start topic but for stop
 
+###Use rest API###
+
+Do the installation inside yoru computer and not inside the robot !
+
+Inside the robot, launch the http services:
+
+    poppy-services poppy-humanoid --http --no-browser
+    
+In your computer, over the same local network:
+
+    rosrun poppy_pkg poppy_over_rest_node.py
+    
+Messages are the same as poppy_node ones. Warning, this is slower.
+
 ###TODO: ###
 
 - useful functions: alias usage, easy compliant
 - adapt to a configuration
+- add primitive to rest node

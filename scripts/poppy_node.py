@@ -44,7 +44,6 @@ def poppy_node():
     for r in write_registers:
         rospy.Subscriber('poppy/register/'+r+'/write', Float32MultiArray, setRegister, callback_args=[r])   
 
-    services = {}
     for p in poppy.primitives:
         rospy.Subscriber('poppy/primitive/'+p.name+'/start', String, usePrimitive, callback_args=[p.name, "start"])   
         rospy.Subscriber('poppy/primitive/'+p.name+'/stop', String, usePrimitive, callback_args=[p.name, "stop"])   
