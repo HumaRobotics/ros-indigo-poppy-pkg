@@ -2,8 +2,8 @@
 ROS Indigo package for Poppy robots
 
 This package contains:
-- one Python scripts that create a PoppyHumanoid object and exposes the motors registers values and the primitives
-- one script to use ROS over network through Rest API: 
+- one Python scripts that creates a PoppyHumanoid object and exposes the motors registers values and the primitives
+- one script to use Poppy over network through Rest API (will work for any Poppy creature)
 
 ###To install: ###
 
@@ -52,5 +52,6 @@ Messages are the same as poppy_node ones. Warning, this is slower.
 ###TODO: ###
 
 - useful functions: alias usage, easy compliant
-- adapt to a configuration
+- adapt to a configuration (humanoid, torso, custom)
 - add primitive to rest node
+- expose as JointState
