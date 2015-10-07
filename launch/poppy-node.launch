@@ -1,0 +1,5 @@
+<launch>
+  <node name="poppy" pkg="poppy_pkg" type="poppy_node.py" output="screen">
+    <param name="creature" value="poppy-humanoid" />
+  </node>
+</launch>

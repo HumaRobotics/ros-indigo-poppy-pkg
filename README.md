@@ -35,6 +35,10 @@ You should see all topics created by the poppy node, for example
 - 'poppy/primitive/< primitive name >/start' to start a primitive. Message content not used, so you can use an empty one: rostopic pub -1 /poppy/primitive/arms_copy_motion/start std_msgs/String ""
 - 'poppy/primitive/< primitive name >/stop' same as primitive start topic but for stop
 
+
+rostopic pub -1 /poppy_node/motors/write sensor_msgs/JointState [0,0,'test'] ['head_z','head_y'] [20,-10] [] [100,100]
+
+
 ###Use rest API###
 
 Do the installation inside yoru computer and not inside the robot !
