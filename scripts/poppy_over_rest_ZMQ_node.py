@@ -1,113 +1,168 @@
 #!/usr/bin/env python
 
 
+#~ THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+#~ WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+#~ MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+#~ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+#~ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+#~ OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+#~ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
 #~ https://github.com/pierre-rouanet/pypot/blob/master/REST-APIs.md
 
 import rospy
-from std_msgs.msg import String, Float32MultiArray, MultiArrayDimension
+from std_msgs.msg import String
+from sensor_msgs.msg import JointState
 
 import zmq, json
 
-#~ registers = ["registers", "goal_speed", "compliant", "safe_compliant", "angle_limit", "present_load", "id", "present_temperature", "moving_speed", "torque_limit", "goal_position", "upper_limit", "lower_limit", "name", "present_speed", "present_voltage", "present_position", "model", "compliance_slope", "compliance_margin"]
-read_registers = ["goal_speed", "compliant", "present_temperature",  "goal_position",   "present_speed",  "present_position", "id"]
-write_registers = ["goal_speed", "compliant", "goal_position"]
+global robot_address
+robot_address = "tcp://poppy.local:6768"
 
-robot_address = 'http://poppy.local:6768'
-
+global socket
 socket = None
 
-def setRegister(data, register):
+
+
+def getRegister(motor, register):
+    #~ c = zmq.Context()
+    #~ socket = c.socket(zmq.REQ)
+    req = {"robot": {"get_register_value": {"motor": motor, "register": register}}}
+    socket.send_json(req)
+    pos = socket.recv_json()
+    return pos
     
-    #~ r = data._connection_header['topic']
-    #~ r= r.replace("/poppy/register/", "")
-    #~ r = r.replace("/write", "")
-    #~ print "register ",r
+def setRegister(motor, register, data):
+    c = zmq.Context()
+    socket = c.socket(zmq.REQ)
+    socket.connect (robot_address)
     
-    register = register[0]
+    req = {"robot": {"set_register_value": {"motor": motor, "register": register, "value": str(data)}}}
+    socket.send_json(req)
+
+        
+
+def JointStateWrite(data):
+    print data
+    for i in range(len(data.name)):
+
+        if len(data.effort) > 0:
+            setRegister(data.name[i], "torque_limit" , data.effort[i])
+            if  data.effort[i] > 0.:
+                setRegister(data.name[i], "compliant" , False)
+            else:
+                setRegister(data.name[i], "compliant" , False)
+        if len(data.position) > 0:
+            setRegister(data.name[i], "goal_position" , data.position[i])
+        if len(data.velocity) > 0:
+            setRegister(data.name[i], "goal_speed" , data.velocity[i])
+
+        
+        
+        
+def usePrimitive(data, args):
+    print "got prim message"
+    print args[0]
+    print args[1]
     
-    for i in range(0, len(data.layout.dim)):
-        m = data.layout.dim[i].label
-        print "motor ",m
-        v = data.data[i]
-        if register == "compliant":
-            v = v!= 0.
-            #~ pass
-        #~ else:
-            #~ v = str(v)
-        print "value ",v
-        
-        #~ url = robot_address +'/motor/'+m+'/register/'+register+'/value.json'
-        
-        c = zmq.Context()
-        socket = c.socket(zmq.REQ)
-        socket.connect ("tcp://poppy.local:6768")
-        
-        
-        req = {"robot": {"set_register_value": {"motor": m, "register": register, "value": str(v)}}}
-        socket.send_json(req)
-        print socket.recv_json()
+    c = zmq.Context()
+    socket = c.socket(zmq.REQ)
+    socket.connect (robot_address)
 
-        #~ values = json.dumps(v)
 
-        #~ req = urllib2.Request(url, values)
-        #~ req.add_header("Content-Type",'application/json')
-        #~ response = urllib2.urlopen(req)
+    if args[1] == "start":
+        req = {"robot": {"start_primitive": {"primitive": args[0]}}}
+        #~ url = robot_address +'/primitive/'+args[0]+'/start.json'
+    else:
+        req = {"robot": {"stop_primitive": {"primitive": args[0]}}}
+        #~ url = robot_address +'/primitive/'+args[0]+'/stop.json'
+    print req
 
+    socket.send_json(req)
         
-#~ def usePrimitive(data, args):
-
-    #~ p = getattr(poppy, args[0])
-    #~ if args[1] == "start":
-        #~ p.start()
-    #~ else:
-        #~ p.stop()
 
 def poppy_node_rest():
     rospy.init_node('poppy_node', anonymous=True)
     rate = rospy.Rate(10) # 10hz
     
+    ip = rospy.get_param(rospy.get_name()+'/ip','poppy.local')
+    port = rospy.get_param(rospy.get_name()+'/port','8888')
+    
+    global robot_address
+    robot_address = 'tcp://'+ip+':'+str(port)
+    print "connecting to "+robot_address
+    
+    global socket
     c = zmq.Context()
     socket = c.socket(zmq.REQ)
-    socket.connect ("tcp://poppy.local:6768")
+    socket.connect (robot_address)
     
     
     req = {"robot": {"get_motors_list": {"alias": "motors"}}}
     socket.send_json(req)
     motorList = socket.recv_json()
-    
-    #~ pubs = {}
-    #~ for m in motorList:
-        #~ pubs[m] = rospy.Publisher('poppy/motor/'+m+'/read', Float32MultiArray, queue_size=10)
- 
-    pubs = {}
-    for r in read_registers:
-        pubs[r] = rospy.Publisher('poppy/register/'+r+'/read', Float32MultiArray, queue_size=10)
 
+    
+    #set motors info as params
+    for m in motorList:
+
+        rospy.set_param(rospy.get_name()+'/motor/'+m+'/id', getRegister(m, "id"))
+        rospy.set_param(rospy.get_name()+'/motor/'+m+'/model', getRegister(m, "model"))
+        #~ rospy.set_param(rospy.get_name()+'/motor/'+m.name+'/direct', m.direct)
+        #~ rospy.set_param(rospy.get_name()+'/motor/'+m.name+'/offset', m.offset)
+        rospy.set_param(rospy.get_name()+'/motor/'+m+'/upper_limit', getRegister(m, "upper_limit"))
+        rospy.set_param(rospy.get_name()+'/motor/'+m+'/lower_limit', getRegister(m, "lower_limit"))
         
-    for r in write_registers:
-        rospy.Subscriber('poppy/register/'+r+'/write', Float32MultiArray, setRegister, callback_args=[r])
+    #create publishers for motors present_position, present_speed, present_load and goal_position and goal_speed and max_torque
+    pubs = {}
+
+    pubs[rospy.get_name()+'/motors/read_present'] = rospy.Publisher(rospy.get_name()+'/motors/read_present', JointState, queue_size=10)
+    pubs[rospy.get_name()+'/motors/read_goal'] = rospy.Publisher(rospy.get_name()+'/motors/read_goal', JointState, queue_size=10)
+
+     #subscribe to topic to change the goal_position, goal_speed and compliance
+    rospy.Subscriber(rospy.get_name()+'/motors/write', JointState, JointStateWrite)   
+    
+    req = {"robot": {"get_primitives_list": {}}}
+    socket.send_json(req)
+    primitivesList = socket.recv_json()
+    
+    for p in primitivesList:
+        rospy.Subscriber(rospy.get_name()+'/primitive/'+p+'/start', String, usePrimitive, callback_args=[p, "start"])   
+        rospy.Subscriber(rospy.get_name()+'/primitive/'+p+'/stop', String, usePrimitive, callback_args=[p, "stop"])  
     
     while not rospy.is_shutdown():
-        for r in read_registers:
+            
+        msg = JointState()
+        msg.name = []
+        msg.position = []
+        msg.velocity = []
+        msg.effort = []
+
+        for m in motorList:           
+            msg.name.append(m)
+            msg.position.append(getRegister(m, "present_position"))
+            msg.velocity.append(getRegister(m, "present_speed"))
+            msg.effort.append(getRegister(m, "present_load"))
+
+        pubs[rospy.get_name()+'/motors/read_present'].publish(msg)
         
-            msg = Float32MultiArray()
-            msg.data = []
-            
-            for m in motorList:
-                req = {"robot": {"get_register_value": {"motor": m, "register": r}}}
-                socket.send_json(req)
-                pos = socket.recv_json()
-                        
-                msg.data.append(pos)
-                dimension = MultiArrayDimension()
-                dimension.label=m
-                msg.layout.dim.append(dimension)
-            
-            
-            pubs[r].publish(msg)
+        
+        msg = JointState()
+        msg.name = []
+        msg.position = []
+        msg.velocity = []
+        msg.effort = []
+
+        for m in motorList:           
+            msg.name.append(m)
+            msg.position.append(getRegister(m, "goal_position"))
+            msg.velocity.append(getRegister(m, "goal_speed"))
+            msg.effort.append(getRegister(m, "torque_limit"))
+
+        pubs[rospy.get_name()+'/motors/read_goal'].publish(msg)
 
         rate.sleep()
-
 
 if __name__ == '__main__':
     try:

@@ -3,9 +3,9 @@ ROS Indigo package for Poppy robots
 
 This package contains:
 - one Python scripts that creates a PoppyHumanoid object and exposes the motors registers values and the primitives
-- one script to use Poppy over network through Rest API (will work for any Poppy creature)
+- two Python scripts to use Poppy over network through Rest API (HTTP or ZMQ)
 
-###To install: ###
+## Installation
 
 Assuming you have ros indigo installed and a catkin workspace set up at <path/to/catkin_ws>
 
@@ -15,47 +15,70 @@ Assuming you have ros indigo installed and a catkin workspace set up at <path/to
     catkin_make
     source devel/setup.bash
 
-###Launch inside the robot: ###
+In the poppy_pkg/launch/poppy-node.launch, set the *creature* parameter to your creature's name (poppy-humanoid, poppy-torso or poppy-ergo-jr) or to th epath to your config file.
+
+## Launch inside the robot:
 
 In terminal 1:
 
-    roscore
+    roslaunch poppy_pkg poppy-node.launch
     
 In terminal 2:
-
-    rosrun poppy_pkg poppy_node.py
-    
-In terminal 3:
 
     rostopic list
 
 You should see all topics created by the poppy node, for example
-- 'poppy/register/< register name >/read' for registers that you can read. Each message contains the values for all motors.
-- 'poppy/register/< register name >/write' for registers where you can write. Example command line to set the head motors not compliant: rostopic pub -1 /poppy/register/compliant/write std_msgs/Float32MultiArray [[["head_z",0,0],["head_y",0,0]],0] [0,0]
-- 'poppy/primitive/< primitive name >/start' to start a primitive. Message content not used, so you can use an empty one: rostopic pub -1 /poppy/primitive/arms_copy_motion/start std_msgs/String ""
+- 'poppy/motors/read_present' (sensor_msgs/JointState) contain the motors current position, speed and load.
+- 'poppy/motors/read_goal' (sensor_msgs/JointState) contain the motors goal position, speed and the current max_torque value (between 0 and 100).
+- 'poppy/motors/write' (sensor_msgs/JointState) allows you to set the goal position, speed and max_torque values. Compliance of the motors are set to False if max_torque is not zero. Example of command line publication: rostopic pub -1 /poppy_node/motors/write sensor_msgs/JointState [0,0,'test'] ['head_z','head_y'] [20,-10] [] [100,100]
+
+- 'poppy/primitive/< primitive name >/start' to start a primitive. Message content not used, so you can use an empty one: rostopic pub -1 /poppy/primitive/arms_copy_motion/start std_msgs/String " "
 - 'poppy/primitive/< primitive name >/stop' same as primitive start topic but for stop
 
+If you do a 
 
-rostopic pub -1 /poppy_node/motors/write sensor_msgs/JointState [0,0,'test'] ['head_z','head_y'] [20,-10] [] [100,100]
+    rosparam list
+    
+You get the IDs, model, and setup (orientation, offset, limit angles) of each motor.
 
 
-###Use rest API###
+If you want to command several poppy creatures at the same type, simply start two nodes with different name parameters.
 
-Do the installation inside yoru computer and not inside the robot !
+## Use rest API
+
+Do the ROS installation and follow the installation step on your computer and not inside the robot !
+
+### HTTP
 
 Inside the robot, launch the http services:
 
     poppy-services poppy-humanoid --http --no-browser
     
-In your computer, over the same local network:
+In the poppy-HTTP.launch file, set your robot's IP and the HTTP server port (8080 by default). In your computer, over the same local network:
 
-    rosrun poppy_pkg poppy_over_rest_node.py
+    roslaunch poppy_pkg poppy-HTTP.launch
     
-Messages are the same as poppy_node ones. Warning, this is slower.
+### ZMQ
 
-###TODO: ###
+Be sure you have the zmq library installed (or *pip install pyzmq*)
 
-- useful functions: alias usage, easy compliant
-- adapt to a configuration (humanoid, torso, custom)
-- add primitive to rest node
-- expose as JointState
+Inside the robot, launch the http services:
+
+    import zmq
+
+    from  pypot.server import ZMQRobotServer
+
+    robot = ... #create your robot from a config file or using the PoppyHumanoid lib
+
+    server = ZMQRobotServer(robot,"0.0.0.0", 6768) 
+
+    # We launch the server inside a thread
+    threading.Thread(target=lambda: server.run()).start()
+    print "ready"
+        
+In the poppy-ZMQ.launch file, set your robot's IP and the HTTP server port (6768 on the previous example). In your computer, over the same local network:
+
+    roslaunch poppy_pkg poppy-ZMQ.launch
+
+Topics and messages are the same as poppy_node ones. Warning, HTTP is slower than ZMQ, itself slower than having ROS directly on the robot.
+

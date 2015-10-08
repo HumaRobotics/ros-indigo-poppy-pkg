@@ -1,6 +1,6 @@
 <launch>
   <node name="poppy" pkg="poppy_rest" type="poppy_over_rest_HTTP_node.py" output="screen">
-    <param name="ip" value="odroid-server.local" />
-    <param name="port" value="8888" />
+    <param name="ip" value="poppy.local" />
+    <param name="port" value="8080" />
   </node>
 </launch>
